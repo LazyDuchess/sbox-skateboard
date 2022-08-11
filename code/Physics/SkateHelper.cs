@@ -1,4 +1,5 @@
 ﻿using Sandbox;
+using System.Linq;
 
 namespace Skateboard.Physics
 {
@@ -60,7 +61,7 @@ namespace Skateboard.Physics
 		/// <example>
 		/// var move = new MoveHelper( Position, Velocity )
 		/// </example>
-		public SkateHelper( Vector3 position, Vector3 velocity ) : this( position, velocity, "solid", "playerclip", "passbullets", "player" )
+		public SkateHelper( Vector3 position, Vector3 velocity ) : this( position, velocity, "solid", "playerclip", "passbullets", "player", "unskateable", "skateable", "vert" )
 		{
 
 		}
@@ -86,7 +87,7 @@ namespace Skateboard.Physics
 		/// Try to move to the position. Will return the fraction of the desired velocity that we travelled.
 		/// Position and Velocity will be what we recommend using.
 		/// </summary>
-		public float TryMove( float timestep )
+		public float TryMove( float timestep, bool inAir )
 		{
 			var timeLeft = timestep;
 			float travelFraction = 0;
@@ -119,7 +120,14 @@ namespace Skateboard.Physics
 					Position += pm.Normal * Time.Delta;
 				if (bump == 0 && pm.Hit)
 					HitNormal = pm.Normal;
-				if ( bump == 0 && pm.Hit && pm.Normal.Angle( Vector3.Up ) >= MaxStandableAngle )
+				if ( bump == 0 && pm.Hit && pm.Normal.Angle( Vector3.Up ) >= MaxStandableAngle)
+				{
+					HitWall = true;
+					if ( !inAir && (pm.Tags.Contains( "skateable" ) || pm.Tags.Contains( "vert" )))
+						HitWall = false;
+				}
+
+				if ( bump == 0 && pm.Hit && pm.Tags.Contains( "unskateable" ) )
 				{
 					HitWall = true;
 				}
@@ -129,8 +137,9 @@ namespace Skateboard.Physics
 				if ( !moveplanes.TryAdd( pm.Normal, ref Velocity, IsFloor( pm ) ? GroundBounce : WallBounce ) )
 					break;
 			}
-
 			
+			if ( travelFraction == 0 )
+				Velocity = 0;
 
 			return travelFraction;
 		}
@@ -184,7 +193,7 @@ namespace Skateboard.Physics
 		/// <summary>
 		/// Like TryMove but will also try to step up if it hits a wall
 		/// </summary>
-		public float TryMoveWithStep( float timeDelta, float stepsize )
+		public float TryMoveWithStep( float timeDelta, float stepsize, bool inair )
 		{
 			var startPosition = Position;
 
@@ -192,7 +201,7 @@ namespace Skateboard.Physics
 			var stepMove = this;
 
 			// Do a regular move
-			var fraction = TryMove( timeDelta );
+			var fraction = TryMove( timeDelta, inair );
 
 			// If it got all the way then that's cool, use it
 			//if ( fraction.AlmostEqual( 0 ) )
@@ -202,7 +211,7 @@ namespace Skateboard.Physics
 			stepMove.TraceMove( Vector3.Up * stepsize );
 
 			// Move across (using existing velocity)
-			var stepFraction = stepMove.TryMove( timeDelta );
+			var stepFraction = stepMove.TryMove( timeDelta, inair );
 
 			// Move back down
 			var tr = stepMove.TraceMove( Vector3.Down * stepsize );

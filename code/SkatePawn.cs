@@ -7,6 +7,25 @@ namespace Skateboard;
 
 partial class SkatePawn : AnimatedEntity
 {
+	/// <summary>
+	/// The clothing container is what dresses the citizen
+	/// </summary>
+	public ClothingContainer Clothing = new();
+
+	//For camera.
+	[Net, Predicted] public bool OnVert { get; set; } = false;
+	[Net, Predicted] public Vector3 VertNormal { get; set; } = Vector3.Zero;
+
+	public SkatePawn()
+	{
+
+	}
+
+	public SkatePawn(Client cl) : this()
+	{
+		Clothing.LoadFromClient( cl );
+	}
+
 	[Net, Predicted] public Rotation RealRotation { get; set; }
 	[Net] public float BailTime { get; set; } = 3f;
 	[Net] float timeBailed { get; set; } = 0f;
@@ -18,6 +37,24 @@ partial class SkatePawn : AnimatedEntity
 	{
 		get => Components.Get<CameraMode>();
 		set => Components.Add( value );
+	}
+
+	public void Respawn()
+	{
+		// Get all of the spawnpoints
+		var spawnpoints = Entity.All.OfType<SpawnPoint>();
+
+		// chose a random one
+		var randomSpawnPoint = spawnpoints.OrderBy( x => Guid.NewGuid() ).FirstOrDefault();
+
+		// if it exists, place the pawn there
+		if ( randomSpawnPoint != null )
+		{
+			var tx = randomSpawnPoint.Transform;
+			tx.Position = tx.Position + Vector3.Up * 50.0f; // raise it up
+			Transform = tx;
+			Spawn();
+		}
 	}
 
 	[Net, Predicted]
@@ -33,7 +70,7 @@ partial class SkatePawn : AnimatedEntity
 		// Use a watermelon model
 		//
 		SetModel( "models/citizen/citizen.vmdl" );
-
+		//SetAnimGraph( "animgraphs/skateanimations.vanmgrph" );
 		EnableDrawing = true;
 		EnableHideInFirstPerson = true;
 		EnableShadowInFirstPerson = true;
@@ -42,6 +79,10 @@ partial class SkatePawn : AnimatedEntity
 		RealRotation = Rotation;
 		timeBailed = 0f;
 		bailed = false;
+		Velocity = 0;
+		AngularVelocity = Angles.Zero;
+
+		Clothing.DressEntity( this );
 	}
 
 	public override void BuildInput( InputBuilder inputBuilder )
@@ -92,6 +133,8 @@ partial class SkatePawn : AnimatedEntity
 
 	public void Bail()
 	{
+		if ( bailed )
+			return;
 		bailed = true;
 		Particles.Create( "particles/impact.flesh.bloodpuff-big.vpcf", Position + Vector3.Up*20f );
 		Particles.Create( "particles/impact.flesh-big.vpcf", Position + Vector3.Up * 20f );
@@ -129,6 +172,8 @@ partial class SkatePawn : AnimatedEntity
 				Spawn();
 			}
 		}
+		if ( Input.Pressed( InputButton.Reload ) && !bailed)
+			Respawn();
 	}
 
 	/// <summary>

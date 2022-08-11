@@ -31,7 +31,7 @@ public partial class Game : Sandbox.Game
 		base.ClientJoined( client );
 
 		// Create a pawn for this client to play with
-		var pawn = new SkatePawn();
+		var pawn = new SkatePawn(client);
 		client.Pawn = pawn;
 
 		// Get all of the spawnpoints
@@ -46,6 +46,7 @@ public partial class Game : Sandbox.Game
 			var tx = randomSpawnPoint.Transform;
 			tx.Position = tx.Position + Vector3.Up * 50.0f; // raise it up
 			pawn.Transform = tx;
+			pawn.Spawn();
 		}
 	}
 }
