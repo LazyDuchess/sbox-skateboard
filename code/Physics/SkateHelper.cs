@@ -103,6 +103,13 @@ namespace Skateboard.Physics
 
 				var pm = TraceFromTo( Position, Position + Velocity * timeLeft );
 
+				if ( bump == 0 && pm.Hit && pm.Normal.Angle( Vector3.Up ) >= MaxStandableAngle )
+				{
+					HitWall = true;
+					if ( !inAir && (pm.Tags.Contains( "skateable" ) || pm.Tags.Contains( "vert" )) )
+						HitWall = false;
+				}
+
 				travelFraction += pm.Fraction;
 
 				if ( pm.Fraction > 0.03125f )
@@ -120,12 +127,7 @@ namespace Skateboard.Physics
 					Position += pm.Normal * Time.Delta;
 				if (bump == 0 && pm.Hit)
 					HitNormal = pm.Normal;
-				if ( bump == 0 && pm.Hit && pm.Normal.Angle( Vector3.Up ) >= MaxStandableAngle)
-				{
-					HitWall = true;
-					if ( !inAir && (pm.Tags.Contains( "skateable" ) || pm.Tags.Contains( "vert" )))
-						HitWall = false;
-				}
+				
 
 				if ( bump == 0 && pm.Hit && pm.Tags.Contains( "unskateable" ) )
 				{

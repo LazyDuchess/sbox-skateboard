@@ -16,6 +16,9 @@ namespace Skateboard.Player;
 /// </summary>
 public partial class SkateController : BasePlayerController
 {
+	//Clientside
+	public bool SnapRotation { get; set; } = false;
+
 	[ConVar.Replicated]
 	public static bool skate_debug { get; set; } = false;
 	public static float StoppedVelocity { get; set; } = 0.01f;
@@ -88,10 +91,10 @@ public partial class SkateController : BasePlayerController
 	[Net] float AirOutSpeed { get; set; } = 2.5f;
 
 	// Collision hack
-	[Net] float wallCollisionSphereRadius { get; set; } = 5f;
+	[Net] float wallCollisionSphereRadius { get; set; } = 6f;
 	[Net] float wallCollisionSphereHeight { get; set; } = 15f;
 	[Net] float wallCollisionSphereGroundDistance { get; set; } = 5f;
-	[Net] float wallCollisionSphereForce { get; set; } = 5f;
+	[Net] float wallCollisionSphereForce { get; set; } = 10f;
 
 	public virtual void UpdateGroundEntity( TraceResult tr )
 	{
@@ -357,28 +360,29 @@ public partial class SkateController : BasePlayerController
 		if (skate_debug)
 			DebugOverlay.Box( Position, mins, maxs, Color.Blue );
 
-		if ( helper.TryMove( Time.Delta, GroundEntity == null ) > 0)
+		if ( helper.TryMove( Time.Delta, GroundEntity == null ) > 0 )
 		{
 			//TODO: ignore collisions when going up walkable stuff while still preventing the player from going oob. Maybe push away when inside walls in skatehelper?
-				
-			if ( helper.HitWall)
+
+			if ( helper.HitWall )
 			{
-				Position = helper.Position;
-				Velocity = helper.Velocity;
-				if ( helper.HitWall && GroundEntity != null)
+				if ( helper.HitWall && GroundEntity != null )
 				{
-					RealRotation = Rotation.LookAt( helper.Velocity.WithZ(0f), RealRotation.Up );
+					RealRotation = Rotation.LookAt( helper.Velocity.WithZ( 0f ), RealRotation.Up );
 				}
 			}
-			else
-			{
-				Position = helper.Position;
-				Velocity = helper.Velocity;
-			}
-			//Rotation = RealRotation;
+			Position = helper.Position;
+			Velocity = helper.Velocity;
 		}
 		else
-			Position += Velocity * Time.Delta;
+		{
+			var trac = Trace.Ray( Position + Vector3.Up * 10f, Position + Vector3.Up * 10f + Velocity * Time.Delta )
+				.WorldAndEntities()
+				.WithAnyTags( "solid", "playerclip", "passbullets", "unskateable" );
+			var sanityTrace = trac.Run();
+			if (!sanityTrace.Hit)
+				Position += Velocity * Time.Delta;
+		}
 
 		Rotation = Rotation.Lerp( Rotation, RealRotation, SmoothingSpeed * Time.Delta );
 		
@@ -405,7 +409,7 @@ public partial class SkateController : BasePlayerController
 					var distance = Vector3.DistanceBetween( tracePos, sphereResult.HitPosition );
 					Position -= heading * (distance + wallCollisionSphereForce);
 			var dot = Velocity.Dot( heading );
-			if (dot < 0f)
+			if (dot > 0f)
 				Velocity -= Velocity.ProjectOnNormal( heading );
 					Log.Info( "sphere hit" );
 			}
@@ -465,10 +469,12 @@ public partial class SkateController : BasePlayerController
 				var oldForwardSpeed = Velocity.Dot( RealRotation.Forward );
 				var prevGroundEnt = GroundEntity;
 				UpdateGroundEntity( floorResult );
+				
 				var oldRotation = RealRotation;
 				RealRotation = MathLD.FromToRotation( Vector3.Up * RealRotation, GroundNormal ) * RealRotation;
 				if ( prevGroundEnt == null )
 				{
+					Log.Info( "landed" );
 					var bailed = false;
 					var angleDifference = oldRotation.Up.Normal.Angle( floorResult.Normal );
 					if ( angleDifference > LandBailMaxAngle )
@@ -483,10 +489,11 @@ public partial class SkateController : BasePlayerController
 						Log.Info( "Landed sideways. (Velocity: " + sidewaysVelocity + ")" );
 						skatePawn.Bail();
 					}
-					if ( Vector3.Dot( Velocity, RealRotation.Forward ) < 0 )
+					if ( Vector3.Dot( Velocity, RealRotation.Forward ) < 0 && Velocity.Length > StoppedVelocity )
 					{
 						RealRotation = Rotation.LookAt( RealRotation.Backward, GroundNormal );
 					}
+					SnapRotation = true;
 					Rotation = RealRotation;
 				}
 				else
@@ -552,6 +559,12 @@ public partial class SkateController : BasePlayerController
 	public override void FrameSimulate()
 	{
 		var RealRotation = (Pawn as SkatePawn).RealRotation;
-		Rotation = Rotation.Lerp( Rotation, RealRotation, SmoothingSpeed * Time.Delta );
+		if (SnapRotation)
+		{
+			SnapRotation = false;
+			Rotation = RealRotation;
+		}
+		else
+			Rotation = Rotation.Lerp( Rotation, RealRotation, SmoothingSpeed * Time.Delta );
 	}
 }

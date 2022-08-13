@@ -7,6 +7,7 @@ namespace Skateboard;
 
 partial class SkatePawn : AnimatedEntity
 {
+	public ModelEntity bailedEntity;
 	/// <summary>
 	/// The clothing container is what dresses the citizen
 	/// </summary>
@@ -29,7 +30,7 @@ partial class SkatePawn : AnimatedEntity
 	[Net, Predicted] public Rotation RealRotation { get; set; }
 	[Net] public float BailTime { get; set; } = 3f;
 	[Net] float timeBailed { get; set; } = 0f;
-	[Net] bool bailed { get; set; } = false;
+	[Net] public bool bailed { get; set; } = false;
 	/// <summary>
 	/// Provides an easy way to switch our current cameramode component
 	/// </summary>
@@ -57,6 +58,9 @@ partial class SkatePawn : AnimatedEntity
 		}
 	}
 
+	[ConVar.Replicated]
+	public static bool skate_as_terry { get; set; } = false;
+
 	[Net, Predicted]
 	public Player.PawnController Controller { get; set; }
 	/// <summary>
@@ -69,7 +73,10 @@ partial class SkatePawn : AnimatedEntity
 		//
 		// Use a watermelon model
 		//
-		SetModel( "models/citizen/citizen.vmdl" );
+		if ( skate_as_terry )
+			SetModel( "models/citizen/citizen.vmdl" );
+		else
+			SetModel( "models/skateboard.vmdl" );
 		//SetAnimGraph( "animgraphs/skateanimations.vanmgrph" );
 		EnableDrawing = true;
 		EnableHideInFirstPerson = true;
@@ -81,8 +88,12 @@ partial class SkatePawn : AnimatedEntity
 		bailed = false;
 		Velocity = 0;
 		AngularVelocity = Angles.Zero;
-
-		Clothing.DressEntity( this );
+		if ( skate_as_terry )
+		{
+			Clothing.DressEntity( this );
+			var board = new ModelEntity( "models/skateboard.vmdl", this );
+			board.Tags.Add( "board" );
+		}
 	}
 
 	public override void BuildInput( InputBuilder inputBuilder )
@@ -115,20 +126,34 @@ partial class SkatePawn : AnimatedEntity
 
 		foreach ( var child in Children )
 		{
-			if ( !child.Tags.Has( "clothes" ) ) continue;
+			if ( !child.Tags.Has( "clothes" ) && !child.Tags.Has("board")) continue;
 			if ( child is not ModelEntity e ) continue;
 
 			var model = e.GetModelName();
-
+			var isBoard = child.Tags.Has( "board" );
 			var clothing = new ModelEntity();
 			clothing.SetModel( model );
-			clothing.SetParent( ent, true );
-			clothing.RenderColor = e.RenderColor;
-			clothing.CopyBodyGroups( e );
-			clothing.CopyMaterialGroup( e );
+			if ( !isBoard )
+			{
+				clothing.SetParent( ent, true );
+				clothing.RenderColor = e.RenderColor;
+				clothing.CopyBodyGroups( e );
+				clothing.CopyMaterialGroup( e );
+			}
+			else
+			{
+				clothing.Position = Position;
+				clothing.Rotation = Rotation;
+				clothing.UsePhysicsCollision = true;
+				clothing.EnableAllCollisions = true;
+				clothing.SurroundingBoundsMode = SurroundingBoundsType.Physics;
+				clothing.PhysicsGroup.Velocity = velocity;
+				clothing.PhysicsEnabled = true;
+			}
 		}
 
 		ent.DeleteAsync( BailTime );
+		bailedEntity = ent;
 	}
 
 	public void Bail()
@@ -136,12 +161,13 @@ partial class SkatePawn : AnimatedEntity
 		if ( bailed )
 			return;
 		bailed = true;
-		Particles.Create( "particles/impact.flesh.bloodpuff-big.vpcf", Position + Vector3.Up*20f );
-		Particles.Create( "particles/impact.flesh-big.vpcf", Position + Vector3.Up * 20f );
-		PlaySound( "kersplat" );
-
+		if ( GetModelName() == "models/citizen/citizen.vmdl" )
+		{
+			Particles.Create( "particles/impact.flesh.bloodpuff-big.vpcf", Position + Vector3.Up * 20f );
+			Particles.Create( "particles/impact.flesh-big.vpcf", Position + Vector3.Up * 20f );
+			PlaySound( "kersplat" );
+		}
 		BecomeRagdollOnClient( Velocity );
-
 		Controller = null;
 
 		EnableAllCollisions = false;
