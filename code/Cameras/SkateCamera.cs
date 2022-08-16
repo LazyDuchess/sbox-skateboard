@@ -6,21 +6,23 @@ namespace Skateboard.Cameras
 	public class SkateCamera : CameraMode
 	{
 		//Terry cam
-		/*
+		
 		private float orbitDistance = 170f;
 		private float orbitHeight = 70f;
 		float vertCameraHeight = 200f;
 		float vertCameraTall = 50f;
-		float fov = 70f
-		float lookDown = 0f;*/
+		float fov = 60f;
+		float lookDown = 0f;
+		float minimumDistance = 0.2f;
 
 		//Skateboard cam
+		/*
 		private float orbitDistance = 150f;
 		private float orbitHeight = 40f;
 		float vertCameraHeight = 200f;
 		float vertCameraTall = 50f;
 		float fov = 55f;
-		float lookDown = 10f;
+		float lookDown = 10f;*/
 
 		private float rotationLerpSpeed = 3f;
 		private float speedLerpSpeed = 5f;
@@ -34,8 +36,6 @@ namespace Skateboard.Cameras
 
 		float vertRotationSpeed = 10f;
 
-		float centerOffset = 0.1f;
-
 		public SkateCamera()
 		{
 			FieldOfView = fov;
@@ -47,7 +47,7 @@ namespace Skateboard.Cameras
 				return;
 			if (pawn.bailed)
 			{
-				var heading = pawn.bailedEntity.Position - Position;
+				var heading = pawn.bailedEntity.GetBoneTransform(pawn.bailedEntity.GetBoneIndex("spine_1")).Position - Position;
 				Rotation = Rotation.LookAt( heading, Vector3.Up );
 				return;
 			}
@@ -79,7 +79,6 @@ namespace Skateboard.Cameras
 
 			
 			var rotLerpSpeed = rotationLerpSpeed;
-			center = Vector3.Lerp( center, targetPos, centerOffset );
 			
 			var tr = Trace.Ray( center, targetPos )
 					.WithAnyTags( "solid" )
@@ -88,8 +87,10 @@ namespace Skateboard.Cameras
 					.Run();
 
 
-
-			Position = tr.EndPosition;
+			if (tr.Fraction <= minimumDistance)
+				Position = Vector3.Lerp( center, targetPos, minimumDistance );
+			else
+				Position = tr.EndPosition;
 
 			if ( pawn.OnVert )
 			{

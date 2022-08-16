@@ -8,6 +8,50 @@ namespace Skateboard.Utils
 {
 	public static class MathLD
 	{
+		public static float CalcShortestRot( float from, float to )
+		{
+			var max = 180f;
+			// If from or to is a negative, we have to recalculate them.
+			// For an example, if from = -45 then from(-45) + 360 = 315.
+			if ( from < 0 )
+			{
+				from += max;
+			}
+
+			if ( to < 0 )
+			{
+				to += max;
+			}
+
+			// Do not rotate if from == to.
+			if ( from == to ||
+			   from == 0 && to == max ||
+			   from == max && to == 0 )
+			{
+				return 0;
+			}
+
+			// Pre-calculate left and right.
+			float left = (360 - from) + to;
+			float right = from - to;
+			// If from < to, re-calculate left and right.
+			if ( from < to )
+			{
+				if ( to > 0 )
+				{
+					left = to - from;
+					right = (max - to) + from;
+				}
+				else
+				{
+					left = (max - to) + from;
+					right = to - from;
+				}
+			}
+
+			// Determine the shortest direction.
+			return ((left <= right) ? left : (right * -1));
+		}
 		//I'm a unity slut
 		//TODO: Clean up ffs
 		public static Rotation FromToRotation( Vector3 fromDirection, Vector3 toDirection )

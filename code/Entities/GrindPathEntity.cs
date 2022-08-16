@@ -13,8 +13,7 @@ namespace Skateboard.Entities
 		public override void Simulate( Client cl )
 		{
 			base.Simulate( cl );
-			DrawPath( 0, false );
-			Log.Info( "what" );
+
 		}
 		public override void DrawPath( int segments, bool drawTangents = false )
 		{

@@ -24,6 +24,7 @@ namespace Skateboard.Physics
 		public Vector3 Position;
 		public Vector3 Velocity;
 		public bool HitWall;
+		public bool HitFloor;
 		public Vector3 HitNormal;
 
 		//
@@ -92,6 +93,7 @@ namespace Skateboard.Physics
 			var timeLeft = timestep;
 			float travelFraction = 0;
 			HitWall = false;
+			HitFloor = false;
 
 			using var moveplanes = new VelocityClipPlanes( Velocity );
 
@@ -103,11 +105,19 @@ namespace Skateboard.Physics
 
 				var pm = TraceFromTo( Position, Position + Velocity * timeLeft );
 
-				if ( bump == 0 && pm.Hit && pm.Normal.Angle( Vector3.Up ) >= MaxStandableAngle )
+				if ( bump == 0 && pm.Hit)
 				{
-					HitWall = true;
-					if ( !inAir && (pm.Tags.Contains( "skateable" ) || pm.Tags.Contains( "vert" )) )
-						HitWall = false;
+					if ( pm.Normal.Angle( Vector3.Up ) >= MaxStandableAngle )
+					{
+						HitWall = true;
+						if ( !inAir && (pm.Tags.Contains( "skateable" ) || pm.Tags.Contains( "vert" )) )
+						{
+							HitWall = false;
+							HitFloor = true;
+						}
+					}
+					else
+						HitFloor = true;
 				}
 
 				travelFraction += pm.Fraction;

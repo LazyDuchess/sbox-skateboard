@@ -21,6 +21,10 @@ public partial class Game : Sandbox.Game
 {
 	public Game()
 	{
+		if (IsServer)
+		{
+			_ = new UI.SkateHUD();
+		}
 	}
 
 	/// <summary>
