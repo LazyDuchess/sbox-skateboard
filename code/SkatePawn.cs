@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using Skateboard.Cameras;
+using Skateboard.Tricks;
 
 namespace Skateboard;
 
@@ -12,6 +13,7 @@ partial class SkatePawn : AnimatedEntity
 		Normal,
 		Landing
 	}
+	[Net] public TrickScoreHolder TrickScores { get; set; }
 	[Net] ModelEntity board { get; set; }
 	/// <summary>
 	/// The player animator is responsible for positioning/rotating the player and
@@ -43,6 +45,7 @@ partial class SkatePawn : AnimatedEntity
 	public SkatePawn()
 	{
 		Animator = new SkateAnimator(this);
+		TrickScores = new TrickScoreHolder();
 	}
 
 	public SkatePawn(Client cl) : this()
@@ -205,6 +208,7 @@ partial class SkatePawn : AnimatedEntity
 	{
 		if ( bailed )
 			return;
+		TrickScores.Failed = true;
 		bailed = true;
 		if ( bailType == BailType.Landing )
 		{

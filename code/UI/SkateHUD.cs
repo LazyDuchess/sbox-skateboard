@@ -16,6 +16,8 @@ namespace Skateboard.UI
 			RootPanel.AddChild<VoiceList>();
 			RootPanel.AddChild<VoiceSpeaker>();
 			RootPanel.AddChild<Scoreboard<ScoreboardEntry>>();
+			RootPanel.AddChild<SkateScore>();
+			RootPanel.AddChild<TrickScore>();
 		}
 	}
 }

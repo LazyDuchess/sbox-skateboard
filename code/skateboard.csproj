@@ -26,7 +26,7 @@
   <PropertyGroup>
 	<OutputPath>../.vs/output/</OutputPath>
 	<DocumentationFile>../.vs/output/skateboard.xml</DocumentationFile>
-	<RootNamespace>Sandbox</RootNamespace>
+	<RootNamespace>Skateboard</RootNamespace>
 	<Nullable>disable</Nullable>
   </PropertyGroup>
 

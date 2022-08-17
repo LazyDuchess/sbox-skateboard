@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Sandbox;
 using Skateboard.Physics;
+using Skateboard.Tricks;
 using Skateboard.Utils;
 
 namespace Skateboard.Player;
@@ -16,6 +17,9 @@ namespace Skateboard.Player;
 /// </summary>
 public partial class SkateController : BasePlayerController
 {
+	//ollie spin trick stuff
+	[Net, Predicted] public float SpunAmount { get; set; } = 0f;
+	[Net] public float LandSpeedMultiplier { get; set; } = 1.0f;
 	//Vert under us? To allow leveling out while falling.
 	[Net, Predicted] public bool HasVertBelow { get; set; } = false;
 	//Speed at which hitting a wall cancels your combo
@@ -29,10 +33,10 @@ public partial class SkateController : BasePlayerController
 	[Net] public float BodyGirth { get; set; } = 8f;
 	[Net] public float BodyGirthAir { get; set; } = 2f;
 	[Net] public float EyeHeight { get; set; } = 64.0f;
-	[Net] public float Gravity { get; set; } = 500.0f;
+	[Net] public float Gravity { get; set; } = 600.0f;
 	[Net, Predicted] public bool Pushing { get; set; } = false;
 	[Net] public float SteerSpeed { get; set; } = 150f;
-	[Net] public float BrakeForce { get; set; } = 350f;
+	[Net] public float BrakeForce { get; set; } = 450f;
 	[Net] public float TractionForce { get; set; } = 0f;
 	[Net] public float SmoothingSpeed { get; set; } = 10f;
 	[Net] public float MaxStandableAngle { get; set; } = 70f;
@@ -40,7 +44,7 @@ public partial class SkateController : BasePlayerController
 	[Net] public float BrakeSteerMultiplier { get; set; } = 1.5f;
 
 	//Air controls
-	[Net] public float AirSpinSpeed { get; set; } = 300f;
+	[Net] public float AirSpinSpeed { get; set; } = 350f;
 	[Net] public float AirPitchSpeed { get; set; } = 50f;
 
 	//Landing too sideways should bail us.
@@ -50,15 +54,15 @@ public partial class SkateController : BasePlayerController
 	[Net] public float LandBailMaxAngle { get; set; } = 60f;
 
 	//Normal speed and acceleration
-	[Net] public float Acceleration { get; set; } = 300f;
-	[Net] public float PushMaxSpeed { get; set; } = 400f;
+	[Net] public float Acceleration { get; set; } = 400f;
+	[Net] public float PushMaxSpeed { get; set; } = 450f;
 
 	//Speed and acceleration when crouched (jump ready)
-	[Net] public float CrouchAcceleration { get; set; } = 400f;
-	[Net] public float CrouchMaxSpeed { get; set; } = 650f;
+	[Net] public float CrouchAcceleration { get; set; } = 600f;
+	[Net] public float CrouchMaxSpeed { get; set; } = 700f;
 
 	//Jump height
-	[Net] public float JumpForce { get; set; } = 200f;
+	[Net] public float JumpForce { get; set; } = 250f;
 
 	//Crouching?
 	[Net, Predicted] public bool JumpReady { get; set; } = false;
@@ -101,8 +105,36 @@ public partial class SkateController : BasePlayerController
 	[Net] float wallCollisionSphereGroundDistance { get; set; } = 5f;
 	[Net] float wallCollisionSphereForce { get; set; } = 10f;
 
+	void CalculateSpinTrick()
+	{
+		if ( GroundEntity != null )
+			return;
+		SpunAmount += AngularVelocity.yaw * Time.Delta;
+	}
+
+	void FinishSpinTrick()
+	{
+		var finalAmount = Math.Ceiling( Math.Abs(SpunAmount) / 180f) * 180f;
+		var remainder = Math.Abs( SpunAmount ) % 180f;
+		if ( remainder <= 90 )
+			finalAmount -= 180;
+		if ( finalAmount <= 0 )
+			return;
+		//Debug( (SpunAmount / 180f).ToString() );
+		var trickSide = "BS";
+		if ( SpunAmount < 0f )
+			trickSide = "FS";
+		var finalTrickName = trickSide + " " + finalAmount.ToString() + " Ollie";
+		var spins = (finalAmount / 180f) - 1;
+		var trick = new TrickScoreEntry( finalTrickName, (int)(100 + (spins * 50)));
+		var skatePawn = Pawn as SkatePawn;
+		skatePawn.TrickScores.Add( trick );
+	}
+
 	public virtual void UpdateGroundEntity( TraceResult tr )
 	{
+		FinishSpinTrick();
+		SpunAmount = 0f;
 		OnVert = false;
 		GroundNormal = tr.Normal;
 
@@ -182,10 +214,10 @@ public partial class SkateController : BasePlayerController
 		var angle = GroundNormal.Angle(Vector3.Up);
 		if ( angle < MinFallableAngle )
 			return;
-		var requiredSpeed = angle * 2.5f;
+		var requiredSpeed = angle * 3.9f;
 		var vel = Vector3.Dot(RealRotation.Forward,Velocity);
 		var downRotationSpeed = angle * 0.025f;
-		var downForwardSpeed = angle * 3.5f;
+		var downForwardSpeed = angle * 4f;
 		var downAngle = Rotation.LookAt( Vector3.Down, GroundNormal );
 		var downRotation = MathLD.FromToRotation( Vector3.Up * downAngle, GroundNormal ) * downAngle;
 		var downwardFacing = RealRotation.Forward.Dot( downRotation.Forward );
@@ -203,7 +235,7 @@ public partial class SkateController : BasePlayerController
 		if ( angle > 90f )
 		{
 			
-			requiredSpeed = angle * 4f;
+			requiredSpeed = angle * 3.9f;
 			Debug( requiredSpeed );
 			if ( vel < requiredSpeed )
 			{
@@ -235,8 +267,8 @@ public partial class SkateController : BasePlayerController
 		var jump = false;
 		if ( skate_debug )
 		{
-			//DebugOverlay.Text( Velocity.Length.ToString(), Position );
-			DebugOverlay.Text( RealRotation.Yaw().ToString(), Position );
+			DebugOverlay.Text( Velocity.Length.ToString(), Position );
+			//DebugOverlay.Text( RealRotation.Yaw().ToString(), Position );
 		}
 		if ( Input.Down( InputButton.Jump ) )
 			JumpReady = true;
@@ -339,6 +371,7 @@ public partial class SkateController : BasePlayerController
 			else
 				AngularVelocity = new Angles( 0f, (InputLD.DigitalLeftInput * AirSpinSpeed), 0f );
 			Velocity += (Gravity * Vector3.Down) * Time.Delta;
+			CalculateSpinTrick();
 		}
 		else
 		{
@@ -551,6 +584,7 @@ public partial class SkateController : BasePlayerController
 			}
 			if ( canStand )
 			{
+				var oldVelocity = Velocity;
 				var oldForwardSpeed = Velocity.Dot( RealRotation.Forward );
 				var prevGroundEnt = GroundEntity;
 				UpdateGroundEntity( floorResult );
@@ -582,16 +616,20 @@ public partial class SkateController : BasePlayerController
 					}
 					SnapRotation = true;
 					Rotation = RealRotation;
+					oldForwardSpeed = oldVelocity.Dot( RealRotation.Forward );
+					var ang = Math.Abs(GroundNormal.Angle( Vector3.Up ));
+					oldForwardSpeed += ang * LandSpeedMultiplier;
 				}
+				/*
 				else
-				{
+				{*/
 					Velocity = oldForwardSpeed * RealRotation.Forward;
-				}
+				//}
 				RealRotation = Rotation.LookAt( RealRotation.Forward, GroundNormal );
 				Velocity -= Velocity.ProjectOnNormal( floorResult.Normal );
 				Position = floorResult.EndPosition + floorResult.Normal * 1f;
 				GroundVert = isVert;
-				
+				skatePawn.TrickScores.Finished = true;
 			}
 			else
 			{

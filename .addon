@@ -1,7 +1,7 @@
 {
   "Title": "Terry\u0027s Alright Skater",
   "Type": "game",
-  "Org": "local",
+  "Org": "lazyduchess",
   "Ident": "skateboard",
   "Schema": 1,
   "HasAssets": true,
@@ -14,15 +14,15 @@
     "MaxPlayers": 64,
     "MinPlayers": 1,
     "GameNetworkType": "Multiplayer",
-    "MapSelect": "Unrestricted",
+    "MapSelect": "Tagged",
     "MapList": [
-      "ska_text"
+      "lazyduchess.hammer_skatepark"
     ],
     "RankType": "None",
     "PerMapRanking": false,
     "LeaderboardType": "None",
     "ProjectTemplate": null,
-    "GameCategory": "None",
+    "GameCategory": "Sports",
     "Collision": {
       "Defaults": {
         "solid": "Collide",
@@ -57,6 +57,11 @@
           "r": "Collide"
         }
       ]
+    },
+    "Compiler": {
+      "RootNamespace": "Skateboard",
+      "DefineConstants": "SANDBOX;ADDON;DEBUG",
+      "NoWarn": "1701;1702;1591;"
     }
   }
 }
