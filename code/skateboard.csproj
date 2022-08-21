@@ -24,8 +24,8 @@
 	</ItemGroup>
 
   <PropertyGroup>
-	<OutputPath>../.vs/output/</OutputPath>
-	<DocumentationFile>../.vs/output/skateboard.xml</DocumentationFile>
+	<OutputPath>E:\Steam\steamapps\common\sbox/.vs/output/</OutputPath>
+	<DocumentationFile>E:\Steam\steamapps\common\sbox/.vs/output/skateboard.xml</DocumentationFile>
 	<RootNamespace>Skateboard</RootNamespace>
 	<Nullable>disable</Nullable>
   </PropertyGroup>

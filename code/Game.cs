@@ -19,10 +19,13 @@ namespace Skateboard;
 /// </summary>
 public partial class Game : Sandbox.Game
 {
+	[ConVar.Replicated]
+	public static bool skate_sim_mode { get; set; } = false;
 	public Game()
 	{
 		if (IsServer)
 		{
+			Global.TickRate = 128;
 			_ = new UI.SkateHUD();
 		}
 	}
@@ -50,7 +53,8 @@ public partial class Game : Sandbox.Game
 			var tx = randomSpawnPoint.Transform;
 			tx.Position = tx.Position + Vector3.Up * 50.0f; // raise it up
 			pawn.Transform = tx;
-			pawn.Spawn();
+			pawn.PostSpawn();
+			//pawn.Spawn();
 		}
 	}
 }

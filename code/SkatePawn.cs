@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using Skateboard.Cameras;
 using Skateboard.Tricks;
+using Skateboard.Player;
 
 namespace Skateboard;
 
@@ -11,10 +12,14 @@ partial class SkatePawn : AnimatedEntity
 	public enum BailType
 	{
 		Normal,
-		Landing
+		Landing,
+		Bail
 	}
+	/// <summary>
+	/// Rolling audio helper.
+	/// </summary>
+	public SkateAudioHelper AudioHelper;
 	[Net] public TrickScoreHolder TrickScores { get; set; }
-	[Net] ModelEntity board { get; set; }
 	/// <summary>
 	/// The player animator is responsible for positioning/rotating the player and
 	/// interacting with the animation graph.
@@ -42,10 +47,12 @@ partial class SkatePawn : AnimatedEntity
 	[Net, Predicted] public bool OnVert { get; set; } = false;
 	[Net, Predicted] public Vector3 VertNormal { get; set; } = Vector3.Zero;
 
+	[Net, Predicted] public AnimatedEntity boardEntity { get; set; }
+
 	public SkatePawn()
 	{
-		Animator = new SkateAnimator(this);
-		TrickScores = new TrickScoreHolder();
+		if (IsClient)
+			AudioHelper = new SkateAudioHelper();
 	}
 
 	public SkatePawn(Client cl) : this()
@@ -68,6 +75,7 @@ partial class SkatePawn : AnimatedEntity
 
 	public void Respawn()
 	{
+		
 		// Get all of the spawnpoints
 		var spawnpoints = Entity.All.OfType<SpawnPoint>();
 
@@ -95,21 +103,47 @@ partial class SkatePawn : AnimatedEntity
 		//
 		// Use a watermelon model
 		//
+		
 		SetModel( "models/skateanimations.vmdl" );
-		//SetAnimGraph( "animgraphs/skateanimations.vanmgrph" );
 		EnableDrawing = true;
 		EnableHideInFirstPerson = true;
 		EnableShadowInFirstPerson = true;
-		Controller = new Player.SkateController();
-		CameraMode = new SkateCamera();
+		Animator = new SkateAnimator( this );
+		TrickScores = new TrickScoreHolder();
+		Controller?.CleanUp();
+		if (Controller == null)
+			Controller = new Player.SkateController( this );
+		if ( CameraMode == null )
+			CameraMode = new SkateCamera();
 		RealRotation = Rotation;
 		timeBailed = 0f;
 		bailed = false;
 		Velocity = 0;
 		AngularVelocity = Angles.Zero;
+
+	}
+
+	void ChangeCamera()
+	{
+		if ( bailed )
+			return;
+		if ( IsServer )
+			return;
+		if (CameraMode is SkateCamera)
+		{
+			CameraMode = new FPSkateCamera();
+		}
+		else
+		{
+			this.EnableDrawing = true;
+			CameraMode = new SkateCamera();
+		}
+	}
+
+	public void PostSpawn()
+	{
 		Clothing.DressEntity( this );
-		board = new ModelEntity( "models/skateboard_animated.vmdl", this );
-		//board.Tags.Add( "board" );
+		boardEntity = new AnimatedEntity( "models/skateboard_animated.vmdl", this );
 	}
 
 	public override void BuildInput( InputBuilder inputBuilder )
@@ -148,31 +182,16 @@ partial class SkatePawn : AnimatedEntity
 
 		foreach ( var child in Children )
 		{
-			if ( !child.Tags.Has( "clothes" )/* && !child.Tags.Has("board")*/) continue;
+			if ( !child.Tags.Has( "clothes" )) continue;
 			if ( child is not ModelEntity e ) continue;
 
 			var model = e.GetModelName();
-			//var isBoard = child.Tags.Has( "board" );
 			var clothing = new ModelEntity();
 			clothing.SetModel( model );
-			/*
-			if ( !isBoard )
-			{*/
-				clothing.SetParent( ent, true );
-				clothing.RenderColor = e.RenderColor;
-				clothing.CopyBodyGroups( e );
-				clothing.CopyMaterialGroup( e );
-			/*}
-			else
-			{
-				clothing.Position = Position;
-				clothing.Rotation = Rotation;
-				clothing.UsePhysicsCollision = true;
-				clothing.EnableAllCollisions = true;
-				clothing.SurroundingBoundsMode = SurroundingBoundsType.Physics;
-				clothing.PhysicsGroup.Velocity = velocity;
-				clothing.PhysicsEnabled = true;
-			}*/
+			clothing.SetParent( ent, true );
+			clothing.RenderColor = e.RenderColor;
+			clothing.CopyBodyGroups( e );
+			clothing.CopyMaterialGroup( e );
 		}
 
 
@@ -183,20 +202,20 @@ partial class SkatePawn : AnimatedEntity
 		//Skateboard--------------------
 		ent = new ModelEntity();
 		ent.Tags.Add( "solid", "debris" );
-		ent.Position = board.Position;
-		ent.Rotation = board.Rotation;
-		ent.Scale = board.Scale;
+		ent.Position = boardEntity.Position;
+		ent.Rotation = boardEntity.Rotation;
+		ent.Scale = boardEntity.Scale;
 		ent.UsePhysicsCollision = true;
 		ent.EnableAllCollisions = true;
 		ent.SetModel( "models/skateboard.vmdl" );
-		ent.CopyBonesFrom( board );
-		ent.CopyBodyGroups( board );
-		ent.CopyMaterialGroup( board );
-		ent.CopyMaterialOverrides( board );
-		ent.TakeDecalsFrom( board );
+		ent.CopyBonesFrom( boardEntity );
+		ent.CopyBodyGroups( boardEntity );
+		ent.CopyMaterialGroup( boardEntity );
+		ent.CopyMaterialOverrides( boardEntity );
+		ent.TakeDecalsFrom( boardEntity );
 		ent.EnableAllCollisions = true;
 		ent.SurroundingBoundsMode = SurroundingBoundsType.Physics;
-		ent.RenderColor = board.RenderColor;
+		ent.RenderColor = boardEntity.RenderColor;
 		ent.PhysicsGroup.Velocity = Velocity;
 		ent.PhysicsGroup.AngularVelocity = new Vector3( AngularVelocity.pitch, AngularVelocity.roll, AngularVelocity.yaw );
 		ent.PhysicsEnabled = true;
@@ -204,18 +223,47 @@ partial class SkatePawn : AnimatedEntity
 		//--------------------------------
 	}
 
+	public bool HasHelmet()
+	{
+		foreach(var element in Children)
+		{
+			if ( element is not AnimatedEntity anim )
+				continue;
+			var modelName = anim.GetModelName();
+			if ( modelName == null )
+				continue;
+			modelName = modelName.ToLowerInvariant();
+			if ( modelName.Contains( "helmet" ) || modelName.Contains("hardhat") )
+				return true;
+		}
+		return false;
+	}
 	public void Bail(BailType bailType = BailType.Normal)
 	{
 		if ( bailed )
 			return;
 		TrickScores.Failed = true;
 		bailed = true;
-		if ( bailType == BailType.Landing )
+		var hasHelmet = HasHelmet();
+		if ( bailType == BailType.Landing)
 		{
-			//Particles.Create( "particles/impact.flesh.bloodpuff-big.vpcf", Position + Vector3.Up * 20f );
-			Particles.Create( "particles/impact.flesh-big.vpcf", Position + Rotation.Up * 50f );
-			PlaySound( "kersplat" );
+			if ( !hasHelmet )
+			{
+				var headPos = Position + Rotation.Up * 70f;
+				Particles.Create( "particles/impact.flesh.vpcf", headPos );
+				PlaySound( "impact-bullet-flesh" );
+			}
+			else
+				PlaySound( "helmet_hit" );
+			//Find something better for blood decals.
+			/*
+			var headTrace = Trace.Ray(headPos, headPos + 50f * Vector3.Down).WithAnyTags( "solid", "player", "npc" );
+			var headTraceResult = headTrace.Run();
+			var dec = ResourceLibrary.Get<DecalDefinition>("decals/blood-impact.decal");
+			DecalSystem.PlaceUsingTrace( dec, headTraceResult );*/
 		}
+		if ( bailType != BailType.Bail )
+			PlaySound( "body_fall" );
 		BecomeRagdollOnClient( Velocity );
 		Controller = null;
 
@@ -245,33 +293,17 @@ partial class SkatePawn : AnimatedEntity
 			if ( timeBailed >= BailTime )
 			{
 				Spawn();
+				PostSpawn();
 			}
 		}
 		if ( Input.Pressed( InputButton.Reload ) && !bailed)
 			Respawn();
 		if ( Input.Pressed( InputButton.Flashlight ) && !bailed )
-			Bail();
-		
-	}/*
-	void MirrorBones()
-	{
-		var boneCount = BoneCount;
-		var myLocalPos = Position;
-		var myLocalRot = Rotation.Inverse;
-		for (var i=0;i<1;i++ )
-		{
-			var parent = GetBoneParent( i );
-			var localPos = myLocalPos;
-			var localRot = myLocalRot;
-			var localBone = GetBoneTransform( i, false );
-				localBone.Position -= localPos;
-				localBone.Position *= localRot;
-				localBone.Rotation = (localRot * localBone.Rotation);
-			myLocalPos = Position;
-			myLocalRot = Rotation.Inverse;
-		}
-		
-	}*/
+			Bail(BailType.Bail);
+		if ( Input.Pressed( InputButton.View ) && !bailed )
+			ChangeCamera();
+	}
+
 	/// <summary>
 	/// Called every frame on the client
 	/// </summary>
@@ -279,10 +311,6 @@ partial class SkatePawn : AnimatedEntity
 	{
 		base.FrameSimulate( cl );
 		Controller?.FrameSimulate( cl, this, GetActiveAnimator());
-
-		// Update rotation every frame, to keep things smooth
-
-		//Rotation = Input.Rotation;
-		//EyeRotation = Rotation;
+		AudioHelper?.FrameSimulate( this );
 	}
 }

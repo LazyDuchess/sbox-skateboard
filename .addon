@@ -62,6 +62,15 @@
       "RootNamespace": "Skateboard",
       "DefineConstants": "SANDBOX;ADDON;DEBUG",
       "NoWarn": "1701;1702;1591;"
+    },
+    "GameSettings": {
+      "skate_sim_mode": {
+        "DisplayType": "Boolean",
+        "Choices": [],
+        "ConVarName": "skate_sim_mode",
+        "DisplayName": "Sim Mode",
+        "DefaultValue": "false"
+      }
     }
   }
 }

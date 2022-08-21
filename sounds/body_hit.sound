@@ -1,0 +1,22 @@
+<!-- kv3 encoding:text:version{e21c7f3c-8a33-41c5-9977-a76d3a32aa0d} format:generic:version{7412167c-06e9-4698-aff2-e63eb59037e7} -->
+{
+	data = 
+	{
+		UI = false
+		Volume = 1
+		VolumeRandom = 0.13
+		Pitch = 1
+		PitchRandom = 0.35
+		Decibels = 80
+		Sounds = 
+		[
+			resource:"sounds/physics/props/flesh/impact_b_01.vsnd",
+			resource:"sounds/physics/props/flesh/impact_b_02.vsnd",
+			resource:"sounds/physics/props/flesh/impact_b_03.vsnd",
+			resource:"sounds/physics/props/flesh/impact_b_04.vsnd",
+		]
+		SelectionMode = "Random"
+		MaximumDistance = 1484.3214
+		MinimumDistance = 74.21607
+	}
+}

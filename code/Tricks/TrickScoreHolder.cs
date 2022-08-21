@@ -53,6 +53,17 @@ namespace Skateboard.Tricks
 				return Entries.Count == 0;
 			}
 		}
+		public bool VisuallyEmpty
+		{
+			get
+			{
+				if ( Empty )
+					return true;
+				if ( String == "" )
+					return true;
+				return false;
+			}
+		}
 		public int Multiplier
 		{
 			get
@@ -82,17 +93,25 @@ namespace Skateboard.Tricks
 			get
 			{
 				var resultString = "";
-				var amount = 0;
-				for(var i=0;i<Entries.Count;i++ )
+				var entriesToDisplay = new List<TrickScoreEntry>();
+				var n = 0;
+				for (var i=Entries.Count-1;i>=0;i-- )
 				{
-					var last = false;
-					if ( i == Entries.Count - 1 || i == maxTricks - 1 )
-						last = true;
-					resultString += Entries[i].Name;
-					if ( !last )
+					var entry = Entries[i];
+					var entryName = Entries[i].Name;
+					if (entryName != "")
+					{
+						entriesToDisplay.Insert( 0, entry );
+					}
+					n++;
+					if ( n >= maxTricks )
+						break;
+				}
+				for (var i=0;i<entriesToDisplay.Count;i++ )
+				{
+					resultString += entriesToDisplay[i].Name;
+					if ( i < entriesToDisplay.Count - 1 )
 						resultString += " + ";
-					else
-						return resultString;
 				}
 				return resultString;
 			}

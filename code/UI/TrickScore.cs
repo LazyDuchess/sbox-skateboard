@@ -26,7 +26,7 @@ namespace Skateboard.UI
 			base.Tick();
 			var skatePawn = Local.Pawn as SkatePawn;
 			var trickHolder = skatePawn.TrickScores;
-			if ( trickHolder.Empty )
+			if ( trickHolder.VisuallyEmpty )
 			{
 				multiplierLabel.SetClass( "multiplier", false );
 				trickLabel.SetClass( "tricks", false );

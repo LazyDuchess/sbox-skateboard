@@ -17,9 +17,15 @@ namespace Skateboard.Player;
 /// </summary>
 public partial class SkateController : BasePlayerController
 {
+	[Net] public float AirTopSpeed { get; set; } = 2000f;
+	[Net] public float TopSpeed { get; set; } = 1300f;
+	//Max slope difference when on ground
+	[Net] public float MaxSlope { get; set; } = 75f;
+	//For vert
+	[Net, Predicted] public float NudgeAmount { get; set; } = 0f;
 	//ollie spin trick stuff
 	[Net, Predicted] public float SpunAmount { get; set; } = 0f;
-	[Net] public float LandSpeedMultiplier { get; set; } = 1.0f;
+	[Net] public float LandSpeedMultiplier { get; set; } = 0.0f;
 	//Vert under us? To allow leveling out while falling.
 	[Net, Predicted] public bool HasVertBelow { get; set; } = false;
 	//Speed at which hitting a wall cancels your combo
@@ -33,7 +39,7 @@ public partial class SkateController : BasePlayerController
 	[Net] public float BodyGirth { get; set; } = 8f;
 	[Net] public float BodyGirthAir { get; set; } = 2f;
 	[Net] public float EyeHeight { get; set; } = 64.0f;
-	[Net] public float Gravity { get; set; } = 600.0f;
+	[Net] public float Gravity { get; set; } = 800.0f;
 	[Net, Predicted] public bool Pushing { get; set; } = false;
 	[Net] public float SteerSpeed { get; set; } = 150f;
 	[Net] public float BrakeForce { get; set; } = 450f;
@@ -44,7 +50,7 @@ public partial class SkateController : BasePlayerController
 	[Net] public float BrakeSteerMultiplier { get; set; } = 1.5f;
 
 	//Air controls
-	[Net] public float AirSpinSpeed { get; set; } = 350f;
+	[Net] public float AirSpinSpeed { get; set; } = 325f;
 	[Net] public float AirPitchSpeed { get; set; } = 50f;
 
 	//Landing too sideways should bail us.
@@ -105,6 +111,31 @@ public partial class SkateController : BasePlayerController
 	[Net] float wallCollisionSphereGroundDistance { get; set; } = 5f;
 	[Net] float wallCollisionSphereForce { get; set; } = 10f;
 
+	public SkateController()
+	{
+		if ( Game.skate_sim_mode )
+			SetSimStats();
+		
+	}
+
+	public SkateController(Entity pawn) : this()
+	{
+		Pawn = pawn;
+	}
+	void SetSimStats()
+	{
+		Gravity = 850f;
+		CrouchMaxSpeed = 600f;
+		JumpForce = 240f;
+		CoyoteTime = 0.1f;
+		SteerSpeed = 125f;
+		BrakeSteerMultiplier = 1.25f;
+		SidewaysBailSpeed = 320f;
+		LandSpeedMultiplier = 0.0f;
+		LandBailMaxAngle = 50f;
+		AirOutSpeed = 1f;
+		TopSpeed = 1000f;
+	}
 	void CalculateSpinTrick()
 	{
 		if ( GroundEntity != null )
@@ -152,6 +183,7 @@ public partial class SkateController : BasePlayerController
 	public virtual void ClearGroundEntity(ref Rotation RealRotation)
 	{
 		if ( GroundEntity == null ) return;
+		NudgeAmount = 0f;
 		if (GroundVert)
 		{
 			GroundVert = false;
@@ -206,6 +238,22 @@ public partial class SkateController : BasePlayerController
 		}
 	}
 
+	public override void CleanUp()
+	{
+		if ( Pawn is not SkatePawn skatePawn )
+			return;
+		skatePawn.RealRotation = Rotation;
+		var pawnRotation = skatePawn.RealRotation;
+		ClearGroundEntity(ref pawnRotation);
+		OnVert = false;
+		HasVertBelow = false;
+		Pushing = false;
+		skatePawn.RealRotation = skatePawn.Rotation;
+		skatePawn.Velocity = Vector3.Zero;
+		skatePawn.AngularVelocity = Angles.Zero;
+		SpunAmount = 0f;
+	}
+
 	void DoUpsideDownFall(ref Rotation RealRotation, ref bool isFalling)
 	{
 		isFalling = false;
@@ -214,19 +262,20 @@ public partial class SkateController : BasePlayerController
 		var angle = GroundNormal.Angle(Vector3.Up);
 		if ( angle < MinFallableAngle )
 			return;
-		var requiredSpeed = angle * 3.9f;
+		var requiredSpeed = angle * 5f;
 		var vel = Vector3.Dot(RealRotation.Forward,Velocity);
 		var downRotationSpeed = angle * 0.025f;
-		var downForwardSpeed = angle * 4f;
+		var downForwardSpeed = angle * 2f;
 		var downAngle = Rotation.LookAt( Vector3.Down, GroundNormal );
 		var downRotation = MathLD.FromToRotation( Vector3.Up * downAngle, GroundNormal ) * downAngle;
 		var downwardFacing = RealRotation.Forward.Dot( downRotation.Forward );
-		//Give us more speed if we're going downwards
+		//Give us less speed if we're trying to go upwards.
 		if ( downwardFacing <= 0f )
 			downForwardSpeed = angle * 2f;
 		//Not a fan of losing speed like this on vert tbh. Leave it for loops, non vert steep slopes and if we're too slow on vert.
+		/*
 		if ( GroundVert && vel >= requiredSpeed )
-			return;
+			return;*/
 		Velocity += downRotation.Forward * downForwardSpeed * Time.Delta;
 		if ( vel >= requiredSpeed )
 			return;
@@ -235,7 +284,7 @@ public partial class SkateController : BasePlayerController
 		if ( angle > 90f )
 		{
 			
-			requiredSpeed = angle * 3.9f;
+			requiredSpeed = angle * 4f;
 			Debug( requiredSpeed );
 			if ( vel < requiredSpeed )
 			{
@@ -252,19 +301,88 @@ public partial class SkateController : BasePlayerController
 			return;
 		Log.Info( log.ToString() );
 	}
+	void SimulateTopSpeed()
+	{
+		var top = TopSpeed;
+		if ( GroundEntity == null )
+			top = AirTopSpeed;
+		if ( Velocity.Length > top )
+			Velocity = Velocity.Normal * top;
+	}
+	void SimulateVert(ref Rotation RealRotation)
+	{
+		if ( Pawn is not SkatePawn skatePawn )
+			return;
+		var vertTraceLen = 100000f;
+		var vertTraceInside = 0.0f;
+		var vertInsideOffset = 2f;
+		HasVertBelow = false;
 
+		var vertTrace = Trace.Ray( Position + (RealRotation.Up * vertTraceInside), Position + (RealRotation.Up * vertTraceInside) - (Vector3.Up * vertTraceLen) )
+							.WorldAndEntities()
+							.WithAnyTags( "vert" );
+		if ( skate_debug )
+			DebugOverlay.Line( Position + (RealRotation.Up * vertTraceInside), Position + (RealRotation.Up * vertTraceInside) - (Vector3.Up * vertTraceLen), Color.Green );
+
+		var vertResult = vertTrace.Run();
+		if ( vertResult.Entity != null )
+		{
+			HasVertBelow = true;
+			var vertNormal = (vertResult.Normal - vertResult.Normal.ProjectOnNormal( Vector3.Up )).Normal;
+			/*
+			if ( VertNormal != vertNormal )
+			{*/
+				var foundVert = true;
+				var lastResult = vertResult;
+				while(foundVert == true)
+				{
+					vertTraceInside -= 0.5f;
+					vertTrace = Trace.Ray( Position + (RealRotation.Up * vertTraceInside), Position + (RealRotation.Up * vertTraceInside) - (Vector3.Up * vertTraceLen) )
+							.WorldAndEntities()
+							.WithAnyTags( "vert" );
+				
+				var vertResult2 = vertTrace.Run();
+				var vertNormal2 = (vertResult2.Normal - vertResult2.Normal.ProjectOnNormal( Vector3.Up )).Normal;
+				if (vertResult2.Entity != null && vertNormal2 == vertNormal)
+					{
+					if ( skate_debug )
+						DebugOverlay.Line( Position + (RealRotation.Up * vertTraceInside), Position + (RealRotation.Up * vertTraceInside) - (Vector3.Up * vertTraceLen), Color.Yellow );
+					foundVert = true;
+					vertNormal = vertNormal2;
+						lastResult = vertResult2;
+					}
+					else
+					{
+						foundVert = false;
+						break;
+					}
+				}
+				vertResult = lastResult;
+				//var off = -RealRotation.Up * vertTraceInside;
+				Position = new Vector3( vertResult.HitPosition.x, vertResult.HitPosition.y, Position.z );
+				RealRotation = MathLD.FromToRotation( Vector3.Up * RealRotation, vertNormal ) * RealRotation;
+				//var normalDifference = (vertNormal - VertNormal).Normal;
+				//Position -= normalDifference * vertInsideOffset;
+				Position += vertNormal * vertInsideOffset;
+			Position += RealRotation.Up * NudgeAmount;
+				VertNormal = vertNormal;
+				skatePawn.VertNormal = vertNormal;
+			//}
+		}
+		Velocity -= Velocity.ProjectOnNormal( VertNormal );
+	}
 	public override void Simulate()
 	{
 		/*
 		if ( broken )
 			return;*/
-
 		var skatePawn = Pawn as SkatePawn;
 		skatePawn.TurnRight = -InputLD.DigitalLeftInput;
 		skatePawn.OnVert = OnVert;
 		var RealRotation = skatePawn.RealRotation;
 		var stopped = Velocity.Length <= StoppedVelocity;
 		var jump = false;
+		
 		if ( skate_debug )
 		{
 			DebugOverlay.Text( Velocity.Length.ToString(), Position );
@@ -335,11 +453,12 @@ public partial class SkateController : BasePlayerController
 
 		//Rotation = Input.Rotation;
 		var vertTraceLen = 100000f;
-		var vertTraceInside = 2.5f;
-		var vertInsideOffset = 1.5f;
+		var vertTraceInside = 0.0f;
+		var vertInsideOffset = 2f;
 		HasVertBelow = false;
 		if ( OnVert )
 		{
+			/*
 			var vertTrace = Trace.Ray( Position + (RealRotation.Up * vertTraceInside), Position + (RealRotation.Up * vertTraceInside) - (Vector3.Up * vertTraceLen) )
 							.WorldAndEntities()
 							.WithAnyTags( "vert" );
@@ -356,12 +475,15 @@ public partial class SkateController : BasePlayerController
 					var off = -RealRotation.Up * vertTraceInside;
 					Position = new Vector3( vertResult.HitPosition.x, vertResult.HitPosition.y, Position.z ) + off;
 					RealRotation = MathLD.FromToRotation( Vector3.Up * RealRotation, vertNormal ) * RealRotation;
-					Position += vertNormal * vertInsideOffset;
+					var normalDifference = (vertNormal - VertNormal).Normal;
+					Position -= normalDifference * vertInsideOffset;
+					//Position += vertNormal * vertInsideOffset;
 					VertNormal = vertNormal;
 					skatePawn.VertNormal = vertNormal;
 				}
 			}
-			Velocity -= Velocity.ProjectOnNormal( VertNormal );
+			Velocity -= Velocity.ProjectOnNormal( VertNormal );*/
+			SimulateVert(ref RealRotation);
 		}
 
 		if ( GroundEntity == null )
@@ -466,16 +588,24 @@ public partial class SkateController : BasePlayerController
 			//TODO: ignore collisions when going up walkable stuff while still preventing the player from going oob. Maybe push away when inside walls in skatehelper?
 			if ((helper.HitFloor || helper.Velocity.Length <= float.Epsilon) && GroundEntity == null)
 			{
-				helper.Position += RealRotation.Up * 2f;
+				if ( OnVert )
+					NudgeAmount += 2f;
+				else
+					helper.Position += RealRotation.Up * 2f;
 				helper.Velocity = Velocity;
 				Debug( "nudge" );
 			}
-				if ( helper.HitWall && GroundEntity != null )
+				if ( helper.HitWall)
+				{
+				if ( GroundEntity != null )
 				{
 					RealRotation = Rotation.LookAt( helper.Velocity.WithZ( 0f ), RealRotation.Up );
 					RealRotation = MathLD.FromToRotation( Vector3.Up * RealRotation, GroundNormal ) * RealRotation;
+				}
 					var velTowardsWall = Velocity.Dot( -helper.HitNormal );
 					if (velTowardsWall >= HitForce)
+					{
+					if ( GroundEntity != null )
 					{
 						Rotation = RealRotation;
 						SnapRotation = true;
@@ -485,6 +615,10 @@ public partial class SkateController : BasePlayerController
 							AddEvent( "back" );
 						else
 							AddEvent( "front" );
+					}
+						skatePawn.PlaySound( "body_hit" );
+						if ( skatePawn.HasHelmet() )
+							skatePawn.PlaySound( "helmet_hit" );
 					}
 				}
 			Position = helper.Position;
@@ -540,7 +674,7 @@ public partial class SkateController : BasePlayerController
 
 		var wasOnGround = GroundEntity != null;
 
-		var currentTrace = 4f;
+		var currentTrace = 3f;
 		
 		if ( GroundEntity == null )
 			currentTrace = 2f;
@@ -582,6 +716,20 @@ public partial class SkateController : BasePlayerController
 				if ( floorResult.Tags.Contains( "vert" ) || floorResult.Tags.Contains("skateable"))
 					canStand = true;
 			}
+			if (canStand && GroundEntity != null)
+			{
+				var slopeDifference = floorResult.Normal.Angle( GroundNormal );
+				/*
+				if (slopeDifference != 0f)
+					Log.Info( slopeDifference.ToString() );*/
+				// > 0f means we're going down
+				var dotFw = Vector3.Dot( floorResult.Normal, Velocity.Normal );
+
+				if ( slopeDifference >= MaxSlope && dotFw > 0f )
+				{
+					canStand = false;
+				}
+			}
 			if ( canStand )
 			{
 				var oldVelocity = Velocity;
@@ -591,15 +739,20 @@ public partial class SkateController : BasePlayerController
 				var towardsFloorSpeed = Vector3.Dot( Velocity, -GroundNormal );
 				if ( towardsFloorSpeed >= 100f && prevGroundEnt == null )
 					AddEvent( "land" );
+				
 				var oldRotation = RealRotation;
 				RealRotation = MathLD.FromToRotation( Vector3.Up * RealRotation, GroundNormal ) * RealRotation;
 				if ( prevGroundEnt == null )
 				{
 					Debug( "landed" );
+					var awkward = false;
+					
+					floorResult.Surface.DoFootstep( skatePawn, floorResult, 0, 20f );
 					var bailed = false;
 					var angleDifference = oldRotation.Up.Normal.Angle( floorResult.Normal );
 					if ( angleDifference > LandBailMaxAngle )
 					{
+						awkward = true;
 						Debug( "Landed awkwardly. (Angle: " + angleDifference + ")" );
 						skatePawn.Bail(SkatePawn.BailType.Landing);
 						bailed = true;
@@ -614,17 +767,18 @@ public partial class SkateController : BasePlayerController
 					{
 						RealRotation = Rotation.LookAt( RealRotation.Backward, GroundNormal );
 					}
+					if (!awkward)
+						skatePawn.PlaySound( "skate_land" );
 					SnapRotation = true;
 					Rotation = RealRotation;
 					oldForwardSpeed = oldVelocity.Dot( RealRotation.Forward );
 					var ang = Math.Abs(GroundNormal.Angle( Vector3.Up ));
 					oldForwardSpeed += ang * LandSpeedMultiplier;
 				}
-				/*
 				else
-				{*/
+				{
 					Velocity = oldForwardSpeed * RealRotation.Forward;
-				//}
+				}
 				RealRotation = Rotation.LookAt( RealRotation.Forward, GroundNormal );
 				Velocity -= Velocity.ProjectOnNormal( floorResult.Normal );
 				Position = floorResult.EndPosition + floorResult.Normal * 1f;
@@ -680,6 +834,7 @@ public partial class SkateController : BasePlayerController
 			jumped = true;
 			currentJumpStrength = JumpStrengthMinimum;
 			AddEvent( "jump" );
+			skatePawn.PlaySound( "ollie" );
 		}
 
 		if ( JumpReady )
@@ -689,11 +844,14 @@ public partial class SkateController : BasePlayerController
 			else
 				currentJumpStrength = 1f;
 		}
+		SimulateTopSpeed();
 	}
 
 	public override void FrameSimulate()
 	{
-		var RealRotation = (Pawn as SkatePawn).RealRotation;
+		if ( Pawn is not SkatePawn skatePawn )
+			return;
+		var RealRotation = skatePawn.RealRotation;
 		if (SnapRotation)
 		{
 			SnapRotation = false;

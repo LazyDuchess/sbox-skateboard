@@ -36,6 +36,8 @@ namespace Skateboard.Cameras
 
 		float vertRotationSpeed = 10f;
 
+		float targetTowardsOriginOffset = 1f;
+
 		public SkateCamera()
 		{
 			FieldOfView = fov;
@@ -77,6 +79,9 @@ namespace Skateboard.Cameras
 			targetPos = Vector3.Lerp( targetPos, vertCamPos, currentVertLerp );
 			center = Vector3.Lerp( center, vertCamCenter, currentVertLerp );
 
+			var headingCenterToTarget = (targetPos - center).Normal;
+
+			center += headingCenterToTarget * targetTowardsOriginOffset;
 			
 			var rotLerpSpeed = rotationLerpSpeed;
 			

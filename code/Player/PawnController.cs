@@ -22,6 +22,11 @@ namespace Skateboard.Player
 
 		public Vector3 WishVelocity { get; set; }
 
+		public virtual void CleanUp()
+		{
+
+		}
+
 		public void UpdateFromEntity( Entity entity )
 		{
 			Position = entity.Position;

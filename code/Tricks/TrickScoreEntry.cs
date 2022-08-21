@@ -11,7 +11,10 @@ namespace Skateboard.Tricks
 	{
 		public TrickScoreEntry()
 		{
-
+			//networking is stupid and makes an empty one for some reason.
+			_name = "";
+			_score = 0;
+			_multiplier = 0;
 		}
 		public TrickScoreEntry(string name = "", int score = 0, int multiplier = 1)
 		{

@@ -9,6 +9,7 @@ namespace Skateboard
 {
 	public class SkateAnimator : PawnAnimator
 	{
+		SkatePawn skatePawn;
 		public SkateAnimator()
 		{
 
@@ -16,6 +17,7 @@ namespace Skateboard
 		public SkateAnimator(Entity pawn) : this()
 		{
 			this.Pawn = pawn;
+			this.skatePawn = pawn as SkatePawn;
 		}
 		public override void Simulate()
 		{
@@ -25,6 +27,7 @@ namespace Skateboard
 			SetAnimParameter( "b_onground", player.GroundEntity != null );
 			SetAnimParameter( "b_crouch", player.Crouch );
 			SetAnimParameter( "f_left", -player.TurnRight );
+			skatePawn?.boardEntity?.SetAnimParameter( "f_left", -player.TurnRight );
 		}
 		public override void OnEvent( string name )
 		{
@@ -32,6 +35,7 @@ namespace Skateboard
 			{
 				case "jump":
 					Trigger( "b_ollie" );
+					skatePawn?.boardEntity?.SetAnimParameter( "b_ollie", true );
 					break;
 				case "land":
 					Trigger( "b_land" );
