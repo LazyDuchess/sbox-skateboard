@@ -53,7 +53,6 @@ namespace Skateboard.Utils
 			return ((left <= right) ? left : (right * -1));
 		}
 		//I'm a unity slut
-		//TODO: Clean up ffs
 		public static Rotation FromToRotation( Vector3 fromDirection, Vector3 toDirection )
 		{
 			Vector3 axis = Vector3.Cross( fromDirection, toDirection );
@@ -76,5 +75,43 @@ namespace Skateboard.Utils
 			aAxis *= (float)Math.Sin( rad );
 			return new Rotation( aAxis.x, aAxis.y, aAxis.z, (float)Math.Cos( rad ) );
 		}
+
+		public struct NearestPoint
+		{
+			public Vector3 Point;
+			public Vector3 Direction;
+			public float Fraction;
+			public bool Outside;
+		}
+
+		public static NearestPoint NearestPointOnLine( Vector3 point, Vector3 lineStart, Vector3 lineEnd, float threshold = 0f )
+		{
+			var lineDirection = (lineEnd - lineStart).Normal;
+			var v = point - lineStart;
+			var d = Vector3.Dot( v, lineDirection );
+			var len = Vector3.DistanceBetween( lineStart, lineEnd );
+			var outside = false;
+			if ( d < threshold || d > len-threshold )
+				outside = true;
+			d = Math.Min( len, Math.Max( 0f, d ) );
+			return new NearestPoint()
+			{
+				Point = lineStart + lineDirection * d,
+				Direction = lineDirection,
+				Fraction = d / len,
+				Outside = outside
+			};
+		}
+		/*
+		//linePnt - point the line passes through
+		//lineDir - unit vector in direction of line, either direction works
+		//pnt - the point to find nearest on line for
+		public static Vector3 NearestPointOnLine( Vector3 linePnt, Vector3 lineDir, Vector3 pnt )
+		{
+			lineDir.Normalize();//this needs to be a unit vector
+			var v = pnt - linePnt;
+			var d = Vector3.Dot( v, lineDir );
+			return linePnt + lineDir * d;
+		}*/
 	}
 }

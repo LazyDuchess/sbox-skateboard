@@ -71,6 +71,10 @@
         "DisplayName": "Sim Mode",
         "DefaultValue": "false"
       }
+    },
+    "ControlModes": {
+      "Keyboard": true,
+      "Gamepad": true
     }
   }
 }
