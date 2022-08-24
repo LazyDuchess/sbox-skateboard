@@ -775,8 +775,8 @@ public partial class SkateController : BasePlayerController
 			{
 				if ( OnVert )
 					NudgeAmount += 2f;
-				else
-					helper.Position += RealRotation.Backward * 5f;
+				//else
+					//helper.Position += RealRotation.Backward * 5f;
 				helper.Velocity = Velocity;
 				Debug( "nudge" );
 			}
