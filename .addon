@@ -19,8 +19,8 @@
       "lazyduchess.hammer_skatepark"
     ],
     "RankType": "None",
-    "PerMapRanking": false,
-    "LeaderboardType": "None",
+    "PerMapRanking": true,
+    "LeaderboardType": "Descending",
     "ProjectTemplate": null,
     "GameCategory": "Sports",
     "Collision": {

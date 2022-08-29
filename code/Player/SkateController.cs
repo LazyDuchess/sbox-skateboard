@@ -24,7 +24,7 @@ public partial class SkateController : BasePlayerController
 	[Net] public float GrindSpeedMultiplier { get; set; } = 1.2f;
 	[Net, Predicted] public TrickScoreEntry GrindTrick { get; set; }
 	[Net, Predicted] public Vector3 GrindNormal { get; set; }
-	[Net] public bool OnGrind { get; set; } = false;
+	[Net, Predicted] public bool OnGrind { get; set; } = false;
 	[Net, Predicted] public Rotation GrindRotation { get; set; }
 	[Net, Predicted] public Vector3 GrindStart { get; set; }
 	[Net, Predicted] public Vector3 GrindEnd { get; set; }
@@ -54,7 +54,7 @@ public partial class SkateController : BasePlayerController
 	[Net] public float Gravity { get; set; } = 800.0f;
 	[Net, Predicted] public bool Pushing { get; set; } = false;
 	[Net] public float SteerSpeed { get; set; } = 150f;
-	[Net] public float BrakeForce { get; set; } = 450f;
+	[Net] public float BrakeForce { get; set; } = 600f;
 	[Net] public float TractionForce { get; set; } = 0f;
 	[Net] public float SmoothingSpeed { get; set; } = 10f;
 	[Net] public float MaxStandableAngle { get; set; } = 70f;
@@ -144,7 +144,7 @@ public partial class SkateController : BasePlayerController
 			Velocity -= GrindDeacceleration * Velocity.Normal * Time.Delta;
 			Velocity = Vector3.Dot( Velocity, GrindNormal ) * GrindNormal;
 			var closestP = MathLD.NearestPointOnLine( Position, GrindStart, GrindEnd, 1f );
-			if ( closestP.Outside )
+			if ( closestP.Outside && Pawn.IsServer )
 			{
 				if ( !TryStartGrind( ref RealRotation, true ) )
 				{
@@ -270,7 +270,6 @@ public partial class SkateController : BasePlayerController
 		if ( !connect )
 		{
 			Velocity *= GrindSpeedMultiplier;
-			Log.Info( "NO CONNECT " + SpunAmount.ToString() );
 			//GrindTrick = ;
 			FinishSpinTrick();
 			skatePawn.TrickScores.Add( new TrickScoreEntry( "50-50", 200, 1 ) );
@@ -739,7 +738,7 @@ public partial class SkateController : BasePlayerController
 		}
 		// apply it to our position using MoveHelper, which handles collision
 		// detection and sliding across surfaces for us
-		var helper = new SkateHelper( Position, Velocity );
+		var helper = new SkateHelper( Pawn, Position, Velocity );
 		helper.MaxStandableAngle = MaxStandableAngle;
 		//helper.Trace = helper.Trace.Size( 0.5f );
 		var collHeight = 15f;
@@ -780,9 +779,25 @@ public partial class SkateController : BasePlayerController
 				helper.Velocity = Velocity;
 				Debug( "nudge" );
 			}
-				if ( helper.HitWall && !OnGrind)
+			if (helper.HitPhysics)
+			{
+				var propHeading = (helper.PropHit.PhysicsBody.MassCenter - helper.Position).Normal;
+				var velTowardsProp = Velocity.Dot( propHeading );
+				velTowardsProp -= helper.PropHit.PhysicsBody.Mass;
+				if ( Pawn.IsServer )
 				{
-				if ( GroundEntity != null )
+					helper.PropHit.Velocity += velTowardsProp * propHeading;
+				}
+				
+				Debug( helper.PropHit.PhysicsBody.Mass );
+				
+				if ( velTowardsProp <= 0f )
+					velTowardsProp = 0f;
+				helper.Velocity = (Velocity - Velocity.ProjectOnNormal( propHeading )) + velTowardsProp * propHeading;
+			}
+				if ( helper.HitWall && !OnGrind && !helper.HitPhysics)
+				{
+				if ( GroundEntity != null)
 				{
 					RealRotation = Rotation.LookAt( helper.Velocity.WithZ( 0f ), RealRotation.Up );
 					RealRotation = MathLD.FromToRotation( Vector3.Up * RealRotation, GroundNormal ) * RealRotation;
@@ -880,7 +895,8 @@ public partial class SkateController : BasePlayerController
 		{
 			var floorTrace = Trace.Ray( Position + traceOffset1, Position + traceOffset2 )
 								.WorldAndEntities()
-								.WithAnyTags( "solid", "playerclip", "passbullets", "player", "vert", "skateable", "unskateable" );
+								.WithAnyTags( "solid", "playerclip", "passbullets", "vert", "skateable", "unskateable" )
+								.WithoutTags( "dynamicprop" );
 			if ( skate_debug )
 				DebugOverlay.Line( Position + traceOffset1, Position + traceOffset2, Color.Red );
 			//DebugOverlay.Line( Position + groundVector * 15f, Position - groundVector * currentTrace, Color.Red );
@@ -901,6 +917,12 @@ public partial class SkateController : BasePlayerController
 						canStand = true;
 					if ( floorResult.Tags.Contains( "vert" ) || floorResult.Tags.Contains( "skateable" ) )
 						canStand = true;
+				}
+				if ( GroundEntity == null )
+				{
+					var velDot = Velocity.Normal.Dot( -floorResult.Normal );
+					if ( velDot < 0f )
+						canStand = false;
 				}
 				if ( canStand && GroundEntity != null )
 				{

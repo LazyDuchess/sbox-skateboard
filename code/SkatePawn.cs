@@ -106,6 +106,7 @@ partial class SkatePawn : AnimatedEntity
 		
 		SetModel( "models/skateanimations.vmdl" );
 		EnableDrawing = true;
+		EnableAllCollisions = true;
 		EnableHideInFirstPerson = true;
 		EnableShadowInFirstPerson = true;
 		Animator = new SkateAnimator( this );
@@ -120,7 +121,32 @@ partial class SkatePawn : AnimatedEntity
 		bailed = false;
 		Velocity = 0;
 		AngularVelocity = Angles.Zero;
+		if (!Tags.Has("player"))
+			Tags.Add( "player" );
+		SetupPhysicsFromAABB( PhysicsMotionType.Keyframed, new Vector3( -8, -8, 0 ), new Vector3( 8, 8, 72 ) );
+		EnableHitboxes = true;
+	}
 
+	void OnComboFinish()
+	{
+		ComboFinishClient();
+		ClientTrickUpdate();
+	}
+	void OnComboFail()
+	{
+		ClientTrickUpdate();
+	}
+	[ClientRpc]
+	void ComboFinishClient()
+	{
+		if (IsLocalPawn)
+			PlaySound( "combo_finish" );
+	}
+	[ClientRpc]
+	void ClientTrickUpdate()
+	{
+		if (IsLocalPawn)
+			TrickScoreHolder.OnLocalTrickScoreUpdate?.Invoke();
 	}
 
 	void ChangeCamera()
@@ -144,6 +170,8 @@ partial class SkatePawn : AnimatedEntity
 	{
 		Clothing.DressEntity( this );
 		boardEntity = new AnimatedEntity( "models/skateboard_animated.vmdl", this );
+		TrickScores.OnComboFinish += OnComboFinish;
+		TrickScores.OnComboFailed += OnComboFail;
 	}
 
 	public override void BuildInput( InputBuilder inputBuilder )
@@ -155,6 +183,8 @@ partial class SkatePawn : AnimatedEntity
 	[ClientRpc]
 	private void BecomeRagdollOnClient( Vector3 velocity )
 	{
+		if ( bailedEntity != null && bailedEntity.IsValid)
+			return;
 		var ent = new ModelEntity();
 		ent.Tags.Add( "ragdoll", "solid", "debris" );
 		ent.Position = Position;
@@ -242,6 +272,8 @@ partial class SkatePawn : AnimatedEntity
 	{
 		if ( bailed )
 			return;
+		if ( IsClient )
+			return;
 		TrickScores.Failed = true;
 		bailed = true;
 		var hasHelmet = HasHelmet();
@@ -302,6 +334,8 @@ partial class SkatePawn : AnimatedEntity
 			Bail(BailType.Bail);
 		if ( Input.Pressed( InputButton.View ) && !bailed )
 			ChangeCamera();
+		if ( WaterLevel >= 0.5f && !bailed)
+			Respawn();
 	}
 
 	/// <summary>

@@ -23,13 +23,39 @@ public partial class Game : Sandbox.Game
 	public static bool skate_sim_mode { get; set; } = false;
 	public Game()
 	{
-		if (IsServer)
+		if ( IsServer )
 		{
 			Global.TickRate = 128;
 			_ = new UI.SkateHUD();
 		}
+		/*
+		else
+			_ = new GameMusic();*/
 	}
 
+	void FixUpProps()
+	{
+		var ents = All.OfType<Prop>();
+		foreach(var element in ents)
+		{
+			if ( element.PhysicsBody != null )
+			{
+				if ( element.PhysicsBody.MotionEnabled )
+					element.Tags.Add( "dynamicprop" );
+				else
+					element.Tags.Add( "staticprop" );
+			}
+			else
+			{
+				element.Tags.Add( "staticprop" );
+			}
+		}
+	}
+	public override void PostLevelLoaded()
+	{
+		if ( IsServer )
+			FixUpProps();
+	}
 	/// <summary>
 	/// A client has joined the server. Make them a pawn to play with
 	/// </summary>

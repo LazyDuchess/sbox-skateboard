@@ -15,6 +15,12 @@ namespace Skateboard.Tricks
 
 		[Net] public int TotalScore { get; set; }
 		[Net] public List<TrickScoreEntry> Entries { get; set; }
+		public delegate void TrickScoreDelegate();
+
+		public TrickScoreDelegate OnComboFinish;
+		public TrickScoreDelegate OnComboFailed;
+		public static TrickScoreDelegate OnLocalTrickScoreUpdate;
+
 		public bool Failed
 		{
 			get
@@ -25,6 +31,8 @@ namespace Skateboard.Tricks
 			{
 				if ( _finished )
 					return;
+				if ( value )
+					OnComboFailed?.Invoke();
 				_finished = value;
 				_failed = value;
 			}
@@ -40,6 +48,8 @@ namespace Skateboard.Tricks
 				if (value && !_finished)
 				{
 					TotalScore = Score * Multiplier;
+					if (!VisuallyEmpty)
+						OnComboFinish?.Invoke();
 				}
 				_finished = value;
 				if ( !_finished )
@@ -128,6 +138,7 @@ namespace Skateboard.Tricks
 		}
 		void Refresh()
 		{
+
 			var resultString = "";
 			var entriesToDisplay = new List<TrickScoreEntry>();
 			var n = 0;

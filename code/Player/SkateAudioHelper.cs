@@ -1,4 +1,5 @@
 ﻿using Sandbox;
+using System;
 
 namespace Skateboard.Player
 {
@@ -25,7 +26,8 @@ namespace Skateboard.Player
 						RollSound.Stop();
 						RollSound = pawn.PlaySound( "skate_roll" );
 					}
-					RollSound.SetVolume( pawnVelocity * 0.01f );
+					RollSound.SetVolume( pawnVelocity * 0.003f );
+					RollSound.SetPitch( Math.Min(1.5f, Math.Max(0.5f, pawnVelocity * 0.0009f)) );
 					PreviouslyOnGround = true;
 				}
 			}

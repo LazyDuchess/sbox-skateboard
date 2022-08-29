@@ -25,6 +25,8 @@ namespace Skateboard.Physics
 		public Vector3 Velocity;
 		public bool HitWall;
 		public bool HitFloor;
+		public bool HitPhysics;
+		public Prop PropHit;
 		public Vector3 HitNormal;
 
 		//
@@ -35,6 +37,8 @@ namespace Skateboard.Physics
 		public float MaxStandableAngle;
 		public Trace Trace;
 
+		public Entity Myself;
+
 		/// <summary>
 		/// Create the movehelper and initialize it with the default settings. 
 		/// You can change Trace and MaxStandableAngle after creation.
@@ -42,17 +46,19 @@ namespace Skateboard.Physics
 		/// <example>
 		/// var move = new MoveHelper( Position, Velocity )
 		/// </example>
-		public SkateHelper( Vector3 position, Vector3 velocity, params string[] solidTags ) : this()
+		public SkateHelper( Entity myself, Vector3 position, Vector3 velocity, params string[] solidTags ) : this()
 		{
 			Velocity = velocity;
 			Position = position;
 			GroundBounce = 0.0f;
 			WallBounce = 0.0f;
 			MaxStandableAngle = 75.0f;
+			Myself = myself;
 
 			Trace = Trace.Ray( 0, 0 )
 							.WorldAndEntities()
-							.WithAnyTags( solidTags );
+							.WithAnyTags( solidTags )
+							.Ignore(myself);
 		}
 
 		/// <summary>
@@ -62,7 +68,7 @@ namespace Skateboard.Physics
 		/// <example>
 		/// var move = new MoveHelper( Position, Velocity )
 		/// </example>
-		public SkateHelper( Vector3 position, Vector3 velocity ) : this( position, velocity, "solid", "playerclip", "passbullets", "player", "unskateable", "skateable", "vert" )
+		public SkateHelper( Entity myself, Vector3 position, Vector3 velocity ) : this( myself, position, velocity, "solid", "playerclip", "player", "passbullets", "unskateable", "skateable", "vert" )
 		{
 
 		}
@@ -94,7 +100,7 @@ namespace Skateboard.Physics
 			float travelFraction = 0;
 			HitWall = false;
 			HitFloor = false;
-
+			HitPhysics = false;
 			using var moveplanes = new VelocityClipPlanes( Velocity );
 
 			for ( int bump = 0; bump < moveplanes.Max; bump++ )
@@ -107,6 +113,13 @@ namespace Skateboard.Physics
 
 				if ( bump == 0 && pm.Hit)
 				{
+					if ( pm.Entity is Prop prop && pm.Entity.Tags.Has("dynamicprop"))
+					{
+						HitPhysics = true;
+						PropHit = prop;
+					}
+					else
+						HitPhysics = false;
 					if ( pm.Normal.Angle( Vector3.Up ) >= MaxStandableAngle )
 					{
 						HitWall = true;

@@ -14,6 +14,7 @@
         padding-bottom: 10px;
         color: #e7af25;
         transform: translateX(-50%);
+        transition: opacity 0.25s ease-out, color 0.1s ease-out;
     }
 
     .done {
@@ -33,5 +34,10 @@
         transform: translateX(-50%);
         text-transform: none;
         font-size: 32px;
+        transition: opacity 0.25s ease-out, color 0.1s ease-out;
+    }
+
+    .fadeout {
+        opacity: 0.0;
     }
 }

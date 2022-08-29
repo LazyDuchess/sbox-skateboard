@@ -5,12 +5,12 @@
 		UI = false
 		Volume = 1
 		VolumeRandom = 0
-		Pitch = 0.58
+		Pitch = 1
 		PitchRandom = 0
 		Decibels = 80
 		Sounds = 
 		[
-			resource:"sounds/physics/props/wood_box/scrape_smooth.vsnd",
+			resource:"sounds/rolls loop 1.vsnd",
 		]
 		SelectionMode = "Random"
 		MaximumDistance = 1484.3214
