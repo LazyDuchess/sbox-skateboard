@@ -950,6 +950,8 @@ public partial class SkateController : BasePlayerController
 
 					var oldRotation = RealRotation;
 					RealRotation = MathLD.FromToRotation( Vector3.Up * RealRotation, GroundNormal ) * RealRotation;
+					if (jump)
+						floorResult.Surface.DoFootstep( skatePawn, floorResult, 0, 20f );
 					if ( prevGroundEnt == null )
 					{
 						Debug( "landed" );
